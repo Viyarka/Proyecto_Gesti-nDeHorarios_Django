@@ -1,0 +1,34 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Informes dinámicos</h1>
+        <p>Filtra sesiones por titulación, curso, asignatura, profesor, grupo, semestre o año académico.</p>
+    </div>
+    <div class="actions">
+        <a class="btn" href="{% url 'exportar_informe_excel' %}?{{ querystring }}">Excel</a>
+        <a class="btn" href="{% url 'exportar_informe_pdf' %}?{{ querystring }}">PDF</a>
+    </div>
+</div>
+<form method="get" class="filter-bar">
+    {{ form.as_p }}
+    <button class="btn primary">Filtrar</button>
+</form>
+<section class="panel table-panel">
+    <table class="data-table">
+        <thead><tr><th>Año</th><th>S</th><th>Titulación</th><th>Curso</th><th>Día</th><th>Hora</th><th>Grupo</th><th>Asignatura</th><th>Profesor</th><th>Aula</th></tr></thead>
+        <tbody>
+        {% for s in sesiones %}
+            <tr>
+                <td>{{ s.horario.anio_academico }}</td><td>{{ s.horario.semestre }}</td><td>{{ s.horario.titulacion.codigo }}</td><td>{{ s.horario.curso.numero }}º</td>
+                <td>{{ s.franja.get_dia_display }}</td><td>{{ s.franja.hora_inicio|time:"H:i" }}-{{ s.franja.hora_fin|time:"H:i" }}</td>
+                <td>{{ s.grupo.nombre }}</td><td>{{ s.asignatura.nombre }} {% if s.asignatura.es_transversal %}<span class="tag">Transversal</span>{% endif %}</td>
+                <td>{{ s.profesor.codigo }}</td><td>{{ s.aula.nombre }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="10">No hay sesiones para este filtro.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

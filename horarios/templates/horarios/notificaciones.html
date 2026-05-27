@@ -1,0 +1,20 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="panel">
+    <div class="page-head">
+        <h1>Notificaciones</h1>
+        <form method="post">{% csrf_token %}<button class="btn">Marcar todas como leídas</button></form>
+    </div>
+    <ul class="clean-list">
+    {% for n in notificaciones %}
+        <li class="notification {{ n.nivel|lower }}">
+            <strong>{{ n.get_nivel_display }}: {{ n.titulo }}</strong><br>
+            {{ n.mensaje }}
+            {% if n.url_destino %}<br><a href="{{ n.url_destino }}">Abrir</a>{% endif %}
+        </li>
+    {% empty %}
+        <li>No hay notificaciones.</li>
+    {% endfor %}
+    </ul>
+</section>
+{% endblock %}

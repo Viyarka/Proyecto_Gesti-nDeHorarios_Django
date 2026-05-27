@@ -1,0 +1,22 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="panel">
+    <h1>Auditoría</h1>
+    <table class="data-table">
+        <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Modelo</th><th>Descripción</th></tr></thead>
+        <tbody>
+        {% for log in logs %}
+            <tr>
+                <td>{{ log.creado|date:"d/m/Y H:i" }}</td>
+                <td>{{ log.usuario|default:"Sistema" }}</td>
+                <td>{{ log.get_accion_display }}</td>
+                <td>{{ log.modelo }}</td>
+                <td>{{ log.descripcion }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5">Sin registros.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

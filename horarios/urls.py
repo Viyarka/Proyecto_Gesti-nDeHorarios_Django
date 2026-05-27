@@ -1,0 +1,31 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", views.dashboard, name="dashboard"),
+    path("horarios/", views.HorarioListView.as_view(), name="horario_lista"),
+    path("horarios/nuevo/", views.HorarioCreateView.as_view(), name="horario_crear"),
+    path("horarios/<int:pk>/", views.horario_detalle, name="horario_detalle"),
+    path("horarios/<int:pk>/editar/", views.HorarioUpdateView.as_view(), name="horario_editar"),
+    path("horarios/<int:pk>/borrar/", views.HorarioDeleteView.as_view(), name="horario_borrar"),
+    path("horarios/<int:pk>/validar/", views.validar_horario_view, name="validar_horario"),
+    path("horarios/<int:pk>/estado/<str:nuevo_estado>/", views.cambiar_estado, name="cambiar_estado"),
+    path("horarios/<int:pk>/exportar/excel/", views.exportar_excel, name="exportar_excel"),
+    path("horarios/<int:pk>/exportar/pdf/", views.exportar_pdf, name="exportar_pdf"),
+    path("sesiones/nueva/", views.SesionCreateView.as_view(), name="sesion_crear"),
+    path("sesiones/<int:pk>/editar/", views.SesionUpdateView.as_view(), name="sesion_editar"),
+    path("sesiones/<int:pk>/borrar/", views.SesionDeleteView.as_view(), name="sesion_borrar"),
+    path("generar/", views.generar_horario, name="generar_horario"),
+    path("generar/global/", views.generar_global, name="generar_global"),
+    path("informes/", views.informes, name="informes"),
+    path("informes/exportar/excel/", views.exportar_informe_excel, name="exportar_informe_excel"),
+    path("informes/exportar/pdf/", views.exportar_informe_pdf, name="exportar_informe_pdf"),
+    path("profesor/carga/", views.carga_profesor, name="carga_profesor"),
+    path("profesor/disponibilidad/", views.disponibilidad_profesor, name="disponibilidad_profesor"),
+    path("alumno/horario/", views.horario_alumno, name="horario_alumno"),
+    path("alumno/matricula/", views.matricula_alumno, name="matricula_alumno"),
+    path("notificaciones/", views.notificaciones, name="notificaciones"),
+    path("auditoria/", views.auditoria, name="auditoria"),
+    path("configuracion/franjas/", views.configuracion_franjas, name="configuracion_franjas"),
+    path("api/sesiones/", views.api_sesiones, name="api_sesiones"),
+]

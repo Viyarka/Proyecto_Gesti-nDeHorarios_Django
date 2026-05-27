@@ -1,0 +1,12 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="panel">
+    <h1>Confirmar borrado</h1>
+    <p>Vas a borrar: <strong>{{ object }}</strong></p>
+    <form method="post">
+        {% csrf_token %}
+        <button class="btn danger" type="submit">Borrar</button>
+        <a class="btn" href="javascript:history.back()">Cancelar</a>
+    </form>
+</section>
+{% endblock %}

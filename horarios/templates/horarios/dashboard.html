@@ -1,0 +1,54 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="hero">
+    <div>
+        <p class="eyebrow">Proyecto final Django</p>
+        <h1>Gestión de horarios académicos</h1>
+        <p>Panel para generar, validar, revisar y consultar horarios evitando solapes entre profesores, aulas y grupos.</p>
+    </div>
+    <a class="btn primary" href="{% url 'generar_global' %}">Generar todos los horarios</a>
+</section>
+
+<section class="cards cards-5">
+    <article class="card"><span class="metric">{{ total_horarios }}</span><p>Horarios</p></article>
+    <article class="card"><span class="metric">{{ total_sesiones }}</span><p>Sesiones</p></article>
+    <article class="card"><span class="metric">{{ horarios_revision }}</span><p>En revisión</p></article>
+    <article class="card"><span class="metric">{{ horarios_aprobados }}</span><p>Aprobados</p></article>
+    <article class="card"><span class="metric">{{ total_profesores }}</span><p>Profesores</p></article>
+</section>
+
+<section class="grid-2">
+    <div class="panel">
+        <div class="section-head"><h2>Horarios abiertos recientemente</h2><a href="{% url 'horario_lista' %}">Ver todos</a></div>
+        <table class="data-table compact">
+            <thead><tr><th>Horario</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+            {% for h in ultimos_horarios %}
+                <tr><td>{{ h }}</td><td><span class="badge state-{{ h.estado|lower }}">{{ h.get_estado_display }}</span></td><td><a href="{{ h.get_absolute_url }}">Abrir</a></td></tr>
+            {% empty %}
+                <tr><td colspan="3">Todavía no has abierto ningún horario en esta sesión.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="panel">
+        <div class="section-head"><h2>Notificaciones</h2><a href="{% url 'notificaciones' %}">Ver todas</a></div>
+        <ul class="clean-list">
+        {% for n in notificaciones %}
+            <li><strong>{{ n.titulo }}</strong><br><span class="muted">{{ n.mensaje }}</span></li>
+        {% empty %}
+            <li>No tienes avisos pendientes.</li>
+        {% endfor %}
+        </ul>
+    </div>
+</section>
+
+<section class="panel requirements-panel">
+    <h2>Cobertura principal de requisitos</h2>
+    <div class="requirements-grid">
+        <span>RF-01 CRUD horarios</span><span>RF-02 Motor de reglas</span><span>RF-03 Informes</span><span>RF-04 Workflow</span>
+        <span>RF-05 Franjas configurables</span><span>RF-08 Disponibilidad</span><span>RF-09 Carga docente</span><span>RF-11 Consulta alumno</span>
+        <span>RF-12 Avisos in-app</span><span>RF-13 Transversales</span><span>RF-14 Conflictos matrícula</span><span>Testing + despliegue</span>
+    </div>
+</section>
+{% endblock %}

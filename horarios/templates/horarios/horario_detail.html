@@ -1,0 +1,59 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ horario }}</h1>
+        <p>Estado actual: <span class="badge">{{ horario.get_estado_display }}</span></p>
+    </div>
+    <div class="actions">
+        <a class="btn" href="{% url 'validar_horario' horario.pk %}">Validar</a>
+        <a class="btn" href="{% url 'exportar_excel' horario.pk %}">Excel</a>
+        <a class="btn" href="{% url 'exportar_pdf' horario.pk %}">PDF</a>
+        <a class="btn" href="{% url 'sesion_crear' %}">Añadir sesión</a>
+    </div>
+</div>
+
+{% if not resultado.es_valido %}
+<div class="message error">
+    Hay conflictos duros. Revisa la validación antes de aprobar.
+</div>
+{% endif %}
+
+<table class="schedule-table">
+    <thead>
+        <tr>
+            <th>Franja</th>
+            {% for dia in dias %}<th>{{ dia }}</th>{% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for fila in tabla %}
+            <tr>
+                <th>{{ fila.inicio|time:"H:i" }} - {{ fila.fin|time:"H:i" }}</th>
+                {% for sesion in fila.dias %}
+                    <td>
+                        {% if sesion %}
+                            <strong>{{ sesion.asignatura.nombre }}</strong>
+                            {% if sesion.asignatura.es_transversal %}<span class="tag">Transversal</span>{% endif %}
+                            <br>{{ sesion.grupo.nombre }} · {{ sesion.profesor.codigo }}
+                            <br><small>{{ sesion.aula.nombre }}</small>
+                            <br><a href="{% url 'sesion_editar' sesion.pk %}">Editar</a>
+                        {% else %}
+                            <span class="muted">Libre</span>
+                        {% endif %}
+                    </td>
+                {% endfor %}
+            </tr>
+        {% empty %}
+            <tr><td colspan="6">Este horario no tiene sesiones.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<section class="workflow">
+    <h2>Workflow</h2>
+    <a class="btn" href="{% url 'cambiar_estado' horario.pk 'REVISION' %}">Enviar a revisión</a>
+    <a class="btn success" href="{% url 'cambiar_estado' horario.pk 'APROBADO' %}">Aprobar</a>
+    <a class="btn danger" href="{% url 'cambiar_estado' horario.pk 'RECHAZADO' %}">Rechazar</a>
+</section>
+{% endblock %}

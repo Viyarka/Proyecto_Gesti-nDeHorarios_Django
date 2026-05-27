@@ -1,0 +1,66 @@
+{% load static horarios_tags %}
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Gestión de Horarios UCJC{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{% static 'horarios/styles.css' %}">
+</head>
+<body>
+<div class="layout {% if not user.is_authenticated %}public-layout{% endif %}">
+    {% if user.is_authenticated %}
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-mark">UCJC</span>
+            <div><strong>Horarios</strong><small>Gestión académica</small></div>
+        </div>
+        <nav class="nav-menu">
+            <a href="{% url 'dashboard' %}">Panel</a>
+            <a href="{% url 'horario_lista' %}">Horarios</a>
+            <a href="{% url 'informes' %}">Informes</a>
+            <a href="{% url 'carga_profesor' %}">Carga docente</a>
+            <a href="{% url 'disponibilidad_profesor' %}">Disponibilidad</a>
+            <a href="{% url 'horario_alumno' %}">Horario alumno</a>
+            <a href="{% url 'matricula_alumno' %}">Matrícula</a>
+            <a href="{% url 'notificaciones' %}">Avisos</a>
+            {% if user|in_group:"Decanato" or user.is_superuser %}
+                <span class="nav-section">Dirección</span>
+                <a href="{% url 'generar_global' %}">Generación global</a>
+                <a href="{% url 'generar_horario' %}">Generar individual</a>
+                <a href="{% url 'configuracion_franjas' %}">Configuración</a>
+                <a href="{% url 'auditoria' %}">Auditoría</a>
+                <a href="/admin/">Admin</a>
+            {% endif %}
+        </nav>
+    </aside>
+    {% endif %}
+
+    <div class="main-area">
+        <header class="topbar">
+            <div>
+                <strong>Sistema de Gestión de Horarios</strong>
+                <span>Desarrollo de Software Avanzado</span>
+            </div>
+            {% if user.is_authenticated %}
+            <div class="user-box">
+                <span>{{ user.username }}</span>
+                <form class="logout-form" action="{% url 'logout' %}" method="post">{% csrf_token %}<button>Salir</button></form>
+            </div>
+            {% endif %}
+        </header>
+
+        <main class="container">
+            {% if messages %}
+                <section class="messages">
+                    {% for message in messages %}
+                        <div class="message {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+</body>
+</html>

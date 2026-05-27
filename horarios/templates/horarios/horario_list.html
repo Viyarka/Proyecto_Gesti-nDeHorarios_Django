@@ -1,0 +1,41 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Horarios</h1>
+        <p>Consulta filtrada por año, semestre, titulación, curso, grupo, asignatura o profesor.</p>
+    </div>
+    <div class="actions">
+        <a class="btn primary" href="{% url 'horario_crear' %}">Nuevo horario</a>
+        <a class="btn" href="{% url 'generar_global' %}">Generar global</a>
+    </div>
+</div>
+
+<form method="get" class="filter-bar">
+    {{ form.as_p }}
+    <button class="btn primary">Filtrar</button>
+</form>
+
+<section class="panel table-panel">
+<table class="data-table">
+    <thead>
+        <tr><th>Año</th><th>Semestre</th><th>Titulación</th><th>Curso</th><th>Estado</th><th>Sesiones</th><th>Acciones</th></tr>
+    </thead>
+    <tbody>
+    {% for h in horarios %}
+        <tr>
+            <td>{{ h.anio_academico }}</td>
+            <td>{{ h.get_semestre_display }}</td>
+            <td>{{ h.titulacion }}</td>
+            <td>{{ h.curso.numero }}º</td>
+            <td><span class="badge state-{{ h.estado|lower }}">{{ h.get_estado_display }}</span></td>
+            <td>{{ h.num_sesiones }}</td>
+            <td><a href="{{ h.get_absolute_url }}">Ver</a> · <a href="{% url 'horario_editar' h.pk %}">Editar</a></td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="7">No se encontraron horarios.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</section>
+{% endblock %}

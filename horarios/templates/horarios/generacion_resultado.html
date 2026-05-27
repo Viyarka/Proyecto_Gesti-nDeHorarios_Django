@@ -1,0 +1,16 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="panel">
+    <h1>Resultado de generación global</h1>
+    <div class="cards">
+        <article class="card"><span class="metric">{{ resultado.creadas }}</span><p>Sesiones creadas</p></article>
+        <article class="card"><span class="metric">{{ resultado.omitidas }}</span><p>Sesiones no colocadas</p></article>
+        <article class="card"><span class="metric">{{ resultado.total }}</span><p>Total procesadas</p></article>
+    </div>
+    <h2>Avisos del motor</h2>
+    <ul>
+        {% for e in resultado.errores %}<li>{{ e }}</li>{% empty %}<li>No hay avisos.</li>{% endfor %}
+    </ul>
+    <a class="btn primary" href="{% url 'horario_lista' %}">Ver horarios</a>
+</section>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="grid-2">
+    <div class="panel">
+        <p class="eyebrow">Motor de generación</p>
+        <h1>Generación global de horarios</h1>
+        <p>Genera todos los horarios de un año académico y semestre en una sola pasada. El motor evita solapes de profesor, aula y grupo en todas las titulaciones.</p>
+        <form method="post" class="form-card">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button class="btn primary" type="submit">Generar globalmente</button>
+        </form>
+    </div>
+    <div class="panel accent">
+        <h2>Qué valida</h2>
+        <ul>
+            <li>Profesor sin dos clases a la vez.</li>
+            <li>Aula sin superposición.</li>
+            <li>Grupo sin dos asignaturas simultáneas.</li>
+            <li>Disponibilidad preferente y bloqueos.</li>
+            <li>Últimos cursos de grados individuales por la tarde.</li>
+            <li>No duplica sesiones ya creadas.</li>
+        </ul>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "horarios/base.html" %}
+{% block title %}Acceso{% endblock %}
+{% block content %}
+<section class="login-card">
+    <h1>Acceso al sistema</h1>
+    <p>Usuarios de demo: <strong>decano / Decano12345</strong>, <strong>profesor / Profesor12345</strong>, <strong>alumno / Alumno12345</strong>.</p>
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn primary" type="submit">Entrar</button>
+    </form>
+</section>
+{% endblock %}

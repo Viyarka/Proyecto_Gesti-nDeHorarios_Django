@@ -1,0 +1,25 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="grid-2">
+    <div class="panel">
+        <h1>Validación de matrícula</h1>
+        <p>Selecciona asignaturas. Antes de guardar, el sistema comprueba solapamientos entre sesiones de distintos cursos o niveles.</p>
+        <form method="post" class="form-card wide-form">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button class="btn primary">Guardar si no hay conflictos</button>
+        </form>
+    </div>
+    <div class="panel">
+        <h2>Conflictos detectados</h2>
+        {% for grupo in conflictos %}
+            <div class="message error">
+                <strong>{{ grupo.0.franja.get_dia_display }} {{ grupo.0.franja.hora_inicio|time:"H:i" }}-{{ grupo.0.franja.hora_fin|time:"H:i" }}</strong>
+                <ul>{% for s in grupo %}<li>{{ s.asignatura.nombre }} · {{ s.grupo.nombre }} · {{ s.profesor.codigo }}</li>{% endfor %}</ul>
+            </div>
+        {% empty %}
+            <p class="muted">Sin conflictos en la selección actual.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

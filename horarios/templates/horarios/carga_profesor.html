@@ -1,0 +1,26 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="panel">
+    <div class="section-head">
+        <div><h1>Carga docente</h1><p>Vista personalizada con código, asignatura, aula, franja y grupo/subgrupo.</p></div>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Día</th><th>Hora</th><th>Código</th><th>Asignatura</th><th>Grupo</th><th>Aula</th><th>Horario</th></tr></thead>
+        <tbody>
+        {% for s in sesiones %}
+            <tr>
+                <td>{{ s.franja.get_dia_display }}</td>
+                <td>{{ s.franja.hora_inicio|time:"H:i" }}-{{ s.franja.hora_fin|time:"H:i" }}</td>
+                <td><code>{{ s.asignatura.codigo }}</code></td>
+                <td>{{ s.asignatura.nombre }} {% if s.asignatura.es_transversal %}<span class="tag">Transversal</span>{% endif %}</td>
+                <td>{{ s.grupo.nombre }} · {{ s.grupo.get_tipo_display }}</td>
+                <td>{{ s.aula.nombre }}</td>
+                <td><a href="{{ s.horario.get_absolute_url }}">{{ s.horario }}</a></td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="7">No hay sesiones asignadas.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

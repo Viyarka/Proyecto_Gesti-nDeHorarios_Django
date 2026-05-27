@@ -1,0 +1,24 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="grid-2">
+    <div class="panel">
+        <h1>Configuración de franjas</h1>
+        <p>Esto evita hardcodear horarios: se guardan como datos configurables.</p>
+        <form method="post" class="form-card">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button class="btn primary" type="submit">Guardar franja</button>
+        </form>
+    </div>
+    <div class="panel">
+        <h2>Franjas actuales</h2>
+        <ul class="clean-list">
+        {% for f in franjas %}
+            <li>{{ f }} {% if not f.activa %}<span class="badge">Inactiva</span>{% endif %}</li>
+        {% empty %}
+            <li>No hay franjas.</li>
+        {% endfor %}
+        </ul>
+    </div>
+</section>
+{% endblock %}

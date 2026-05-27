@@ -1,0 +1,25 @@
+{% extends "horarios/base.html" %}
+{% block content %}
+<section class="panel">
+    <div class="section-head">
+        <div><h1>Validación del horario</h1><p><strong>{{ horario }}</strong></p></div>
+        <a class="btn" href="{{ horario.get_absolute_url }}">Volver al horario</a>
+    </div>
+    {% if resultado.es_valido %}
+        <div class="message success">El horario no tiene conflictos duros y cumple las horas requeridas.</div>
+    {% else %}
+        <div class="message error">El horario tiene conflictos, horas duplicadas o carga lectiva incompleta.</div>
+    {% endif %}
+
+    <div class="grid-2">
+        <div>
+            <h2>Errores</h2>
+            <ul>{% for e in resultado.errores %}<li>{{ e }}</li>{% empty %}<li>No hay errores.</li>{% endfor %}</ul>
+        </div>
+        <div>
+            <h2>Avisos</h2>
+            <ul>{% for a in resultado.avisos %}<li>{{ a }}</li>{% empty %}<li>No hay avisos.</li>{% endfor %}</ul>
+        </div>
+    </div>
+</section>
+{% endblock %}
