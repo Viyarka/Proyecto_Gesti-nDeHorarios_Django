@@ -191,6 +191,19 @@ data/horarios_iniciales.csv  Datos normalizados del Excel
 docs/                   Guías de defensa, despliegue y requisitos
 ```
 
+## Aplicación desplegada
+
+La aplicación está desplegada en Render y disponible en el siguiente enlace:
+
+https://proyecto-gesti-ndehorarios-django.onrender.com/horarios/
+
+Usuarios de prueba:
+
+- decano / Decano12345
+- profesor / Profesor12345
+- alumno / Alumno12345
+- it / ITusuario12345
+
 ## Autor
 
 Pablo Villarquide  
