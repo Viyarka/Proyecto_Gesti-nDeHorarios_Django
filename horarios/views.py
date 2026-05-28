@@ -120,7 +120,7 @@ class HorarioListView(LoginRequiredMixin, ListView):
     model = Horario
     template_name = "horarios/horario_list.html"
     context_object_name = "horarios"
-    paginate_by = 20
+    paginate_by = 50
 
     def get_queryset(self):
         qs = Horario.objects.select_related("titulacion", "curso").annotate(num_sesiones=Count("sesiones", distinct=True))
@@ -497,10 +497,107 @@ def escribir_sesiones_excel(sesiones, titulo="Horario académico"):
     return output
 
 
+def sesiones_horario_matriz(horario):
+    """Prepara una matriz semanal solo con las sesiones del horario actual."""
+    dias = ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES"]
+    sesiones = horario.sesiones.select_related("asignatura", "profesor", "aula", "grupo", "franja")
+    franjas_unicas = (
+        sesiones.values("franja__hora_inicio", "franja__hora_fin")
+        .distinct()
+        .order_by("franja__hora_inicio", "franja__hora_fin")
+    )
+
+    filas = []
+    for franja in franjas_unicas:
+        inicio = franja["franja__hora_inicio"]
+        fin = franja["franja__hora_fin"]
+        fila = {"inicio": inicio, "fin": fin, "dias": []}
+        for dia in dias:
+            sesion = sesiones.filter(
+                franja__dia=dia,
+                franja__hora_inicio=inicio,
+                franja__hora_fin=fin,
+            ).first()
+            fila["dias"].append(sesion)
+        filas.append(fila)
+    return dias, filas
+
+
+def escribir_horario_excel(horario):
+    """Exporta el horario que se está viendo en formato tabla semanal."""
+    dias, filas = sesiones_horario_matriz(horario)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Horario"
+
+    columnas = ["Franja"] + [dia.title() for dia in dias]
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(columnas))
+    ws.cell(row=1, column=1, value=f"Horario {horario}")
+    ws.cell(row=1, column=1).font = Font(bold=True, size=18, color="FFFFFF")
+    ws.cell(row=1, column=1).fill = PatternFill("solid", fgColor="002855")
+    ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
+
+    total = horario.sesiones.count()
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(columnas))
+    ws.cell(row=2, column=1, value=f"{horario.get_semestre_display()} · {horario.titulacion.nombre} · {horario.curso.numero}º · Total de sesiones: {total}")
+    ws.cell(row=2, column=1).font = Font(italic=True, color="334155")
+    ws.cell(row=2, column=1).alignment = Alignment(horizontal="center")
+
+    ws.append(columnas)
+    header_row = 3
+    header_fill = PatternFill("solid", fgColor="0B3A66")
+    thin = Side(style="thin", color="CBD5E1")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    for cell in ws[header_row]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+
+    for fila in filas:
+        valores = [f"{fila['inicio']:%H:%M} - {fila['fin']:%H:%M}"]
+        for sesion in fila["dias"]:
+            if sesion:
+                valores.append(
+                    f"{sesion.asignatura.nombre}\n"
+                    f"{sesion.grupo.nombre} · {sesion.profesor.codigo}\n"
+                    f"{sesion.aula.nombre}"
+                )
+            else:
+                valores.append("Libre")
+        ws.append(valores)
+
+    for row in ws.iter_rows(min_row=4, max_row=ws.max_row):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+        row[0].font = Font(bold=True, color="002855")
+        row[0].fill = PatternFill("solid", fgColor="EAF1F8")
+        if row[0].row % 2 == 0:
+            for cell in row[1:]:
+                cell.fill = PatternFill("solid", fgColor="F8FAFC")
+
+    ws.column_dimensions["A"].width = 16
+    for idx in range(2, len(columnas) + 1):
+        ws.column_dimensions[get_column_letter(idx)].width = 32
+    for row_idx in range(4, ws.max_row + 1):
+        ws.row_dimensions[row_idx].height = 60
+
+    ws.freeze_panes = "B4"
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+
 @login_required
 def exportar_excel(request, pk):
-    horario = get_object_or_404(Horario, pk=pk)
-    output = escribir_sesiones_excel(horario.sesiones.select_related("horario", "horario__titulacion", "horario__curso", "asignatura", "profesor", "aula", "grupo", "franja"), titulo=f"Horario {horario}")
+    horario = get_object_or_404(
+        Horario.objects.select_related("titulacion", "curso"),
+        pk=pk,
+    )
+    output = escribir_horario_excel(horario)
     response = HttpResponse(output, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = f'attachment; filename="horario_{horario.pk}.xlsx"'
     return response
@@ -552,10 +649,63 @@ def escribir_sesiones_pdf(titulo, sesiones):
     return output
 
 
+def escribir_horario_pdf(horario):
+    """Exporta únicamente el horario actual en formato tabla semanal."""
+    dias, filas = sesiones_horario_matriz(horario)
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=landscape(A4), leftMargin=22, rightMargin=22, topMargin=22, bottomMargin=22)
+    styles = getSampleStyleSheet()
+    titulo = f"Horario {horario}"
+    subtitulo = f"{horario.get_semestre_display()} · {horario.titulacion.nombre} · {horario.curso.numero}º · Total de sesiones: {horario.sesiones.count()}"
+    story = [Paragraph(titulo, styles["Title"]), Paragraph(subtitulo, styles["Normal"]), Spacer(1, 12)]
+
+    data = [["Franja"] + [dia.title() for dia in dias]]
+    for fila in filas:
+        row = [f"{fila['inicio']:%H:%M}<br/>{fila['fin']:%H:%M}"]
+        for sesion in fila["dias"]:
+            if sesion:
+                contenido = (
+                    f"<b>{sesion.asignatura.nombre}</b><br/>"
+                    f"{sesion.grupo.nombre} · {sesion.profesor.codigo}<br/>"
+                    f"{sesion.aula.nombre}"
+                )
+            else:
+                contenido = "<font color='#64748B'>Libre</font>"
+            row.append(Paragraph(contenido, styles["BodyText"]))
+        data.append(row)
+
+    table = Table(data, repeatRows=1, colWidths=[62, 142, 142, 142, 142, 142])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#002855")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 8),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#EAF1F8")),
+        ("TEXTCOLOR", (0, 1), (0, -1), colors.HexColor("#002855")),
+        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#CBD5E1")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("FONTSIZE", (0, 1), (-1, -1), 7),
+        ("ROWBACKGROUNDS", (1, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(table)
+    doc.build(story)
+    output.seek(0)
+    return output
+
+
 @login_required
 def exportar_pdf(request, pk):
-    horario = get_object_or_404(Horario, pk=pk)
-    output = escribir_sesiones_pdf(f"Horario {horario}", horario.sesiones.select_related("horario", "horario__titulacion", "horario__curso", "asignatura", "profesor", "aula", "grupo", "franja"))
+    horario = get_object_or_404(
+        Horario.objects.select_related("titulacion", "curso"),
+        pk=pk,
+    )
+    output = escribir_horario_pdf(horario)
     return FileResponse(output, as_attachment=True, filename=f"horario_{horario.pk}.pdf")
 
 

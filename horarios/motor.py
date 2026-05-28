@@ -1,3 +1,4 @@
+import random
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Iterable
@@ -121,13 +122,32 @@ def validar_horario(horario, exigir_horas=False):
 
 
 def _franjas_ordenadas_para_asignatura(asignatura):
+    """Devuelve franjas disponibles para una asignatura.
+
+    Para que la demo sea más realista, el motor trabaja con un máximo de tres
+    bloques por día. En los cursos normales usa los bloques de mañana
+    09:00-11:00, 11:00-13:00 y 13:00-15:00. En último curso de grados simples
+    se mantienen tres bloques de tarde para respetar la restricción de dominio
+    de planificación por la tarde.
+    """
     franjas = list(FranjaHoraria.objects.filter(activa=True))
     orden_dias = {dia: indice for indice, dia in enumerate(DIAS_ORDEN)}
     franjas.sort(key=lambda f: (orden_dias.get(f.dia, 99), f.hora_inicio, f.hora_fin))
 
-    # Regla de dominio: en grados individuales el último año se planifica por la tarde.
-    if asignatura.curso.numero >= asignatura.curso.titulacion.duracion_anios and not asignatura.curso.titulacion.permite_manana_tarde:
-        franjas = [f for f in franjas if f.es_tarde]
+    es_ultimo_curso_individual = (
+        asignatura.curso.numero >= asignatura.curso.titulacion.duracion_anios
+        and not asignatura.curso.titulacion.permite_manana_tarde
+    )
+
+    if es_ultimo_curso_individual:
+        horas_permitidas = {(15, 30), (17, 30), (19, 30)}
+    else:
+        horas_permitidas = {(9, 0), (11, 0), (13, 0)}
+
+    franjas = [
+        f for f in franjas
+        if (f.hora_inicio.hour, f.hora_inicio.minute) in horas_permitidas
+    ]
 
     preferidas = []
     normales = []
@@ -153,6 +173,62 @@ def _franjas_ordenadas_para_asignatura(asignatura):
             normales.append(franja)
 
     return preferidas + normales
+
+
+def _slots_transversales_existentes(anio_academico, semestre, codigo_global):
+    if not codigo_global:
+        return []
+    sesiones = (
+        Sesion.objects.filter(
+            horario__anio_academico=anio_academico,
+            horario__semestre=semestre,
+            asignatura__codigo_global_compartido=codigo_global,
+        )
+        .select_related("franja")
+        .order_by("franja__dia", "franja__hora_inicio")
+    )
+    franjas = []
+    vistos = set()
+    for sesion in sesiones:
+        clave = (sesion.franja.dia, sesion.franja.hora_inicio, sesion.franja.hora_fin)
+        if clave not in vistos:
+            vistos.add(clave)
+            franjas.append(sesion.franja)
+    return franjas
+
+
+def _elegir_dia_libre(total_sesiones, dias_obligados=None):
+    dias_obligados = set(dias_obligados or [])
+    candidatos = [dia for dia in DIAS_ORDEN if dia not in dias_obligados]
+    if not candidatos:
+        return None
+    # Para 10 sesiones se consigue una distribución tipo 3-3-2-2-0.
+    # Para 12 sesiones se consigue 3-3-3-3-0.
+    return random.choice(candidatos)
+
+
+def _ordenar_candidatas_por_reparto(franjas, dia_libre, conteo_por_dia, dias_asignatura, slots_usados):
+    candidatas = []
+    for franja in franjas:
+        clave = (franja.dia, franja.hora_inicio, franja.hora_fin)
+        if clave in slots_usados:
+            continue
+        if dia_libre and franja.dia == dia_libre:
+            continue
+        if conteo_por_dia[franja.dia] >= 3:
+            continue
+        candidatas.append(franja)
+
+    # Primera pasada: no repetir la misma asignatura en el mismo día.
+    sin_repetir_dia = [f for f in candidatas if f.dia not in dias_asignatura]
+    if sin_repetir_dia:
+        candidatas = sin_repetir_dia
+
+    # Priorizamos días con menos clases para que no aparezcan 5 clases en lunes/martes.
+    # El componente random hace que cada generación global pueda variar.
+    random.shuffle(candidatas)
+    candidatas.sort(key=lambda f: (conteo_por_dia[f.dia], DIAS_ORDEN.index(f.dia)))
+    return candidatas
 
 
 def _crear_sesion_si_cabe(horario, asignatura, grupo, franja):
@@ -195,8 +271,13 @@ def generar_horario_basico(horario, sobrescribir=False):
 def generar_horarios_globales(anio_academico, semestre, horarios=None, sobrescribir=False):
     """Genera todos los horarios de un semestre a la vez.
 
-    Al crear las sesiones se usa Sesion.clean(), que mira profesor/aula/grupo en todo el año
-    académico y semestre. Por eso no permite que un profesor quede solapado entre titulaciones.
+    Reglas aplicadas en la generación:
+    - máximo 3 clases por día en cada horario;
+    - se intenta dejar 1 día libre por horario;
+    - las sesiones se reparten por toda la semana;
+    - una misma asignatura no se coloca dos veces en el mismo día;
+    - se respeta disponibilidad/bloqueos del profesorado;
+    - las asignaturas transversales mantienen las mismas franjas globales.
     """
     if horarios is None:
         horarios = Horario.objects.filter(anio_academico=anio_academico, semestre=semestre).select_related("curso", "titulacion")
@@ -214,48 +295,120 @@ def generar_horarios_globales(anio_academico, semestre, horarios=None, sobrescri
         key=lambda h: (0 if h.titulacion.permite_manana_tarde else 1, h.titulacion.codigo, h.curso.numero),
     )
 
+    plan_transversales = {}
+
     for horario in horarios:
+        # Si no se pide sobrescribir y el horario ya tiene sesiones, no intentamos
+        # completarlo para evitar duplicados o mezclas de generaciones anteriores.
+        if not sobrescribir and horario.sesiones.exists():
+            continue
+
         grupo = horario.curso.grupos.order_by("nombre").first()
         if not grupo:
             resultado.errores.append(f"{horario}: no tiene grupo creado.")
             continue
 
-        asignaturas = (
+        asignaturas = list(
             Asignatura.objects.filter(curso=horario.curso, semestre=horario.semestre)
             .select_related("profesor_titular", "aula_preferente", "curso", "curso__titulacion")
-            .order_by("codigo")
+            .order_by("-es_transversal", "codigo")
         )
+
+        total_objetivo = sum(a.sesiones_semanales for a in asignaturas)
+        conteo_por_dia = defaultdict(int)
+        slots_usados = set()
+
+        for sesion in horario.sesiones.select_related("franja"):
+            conteo_por_dia[sesion.franja.dia] += 1
+            slots_usados.add((sesion.franja.dia, sesion.franja.hora_inicio, sesion.franja.hora_fin))
+
+        dias_obligados = set()
+        for asignatura in asignaturas:
+            if asignatura.es_transversal and asignatura.codigo_global_compartido:
+                clave_global = (anio_academico, semestre, asignatura.codigo_global_compartido)
+                franjas_globales = plan_transversales.get(clave_global) or _slots_transversales_existentes(
+                    anio_academico, semestre, asignatura.codigo_global_compartido
+                )
+                dias_obligados.update(f.dia for f in franjas_globales)
+
+        dia_libre = _elegir_dia_libre(total_objetivo, dias_obligados=dias_obligados)
 
         for asignatura in asignaturas:
             sesiones_actuales = horario.sesiones.filter(asignatura=asignatura, grupo=grupo).count()
             necesarias = max(asignatura.sesiones_semanales - sesiones_actuales, 0)
+            if necesarias <= 0:
+                continue
 
-            for _ in range(necesarias):
-                colocada = False
-                dias_ya_usados = set(
-                    horario.sesiones.filter(asignatura=asignatura, grupo=grupo)
-                    .values_list("franja__dia", flat=True)
+            franjas_fijas = []
+            clave_global = None
+            if asignatura.es_transversal and asignatura.codigo_global_compartido:
+                clave_global = (anio_academico, semestre, asignatura.codigo_global_compartido)
+                franjas_fijas = plan_transversales.get(clave_global) or _slots_transversales_existentes(
+                    anio_academico, semestre, asignatura.codigo_global_compartido
                 )
-                franjas_candidatas = _franjas_ordenadas_para_asignatura(asignatura)
+                franjas_fijas = franjas_fijas[:asignatura.sesiones_semanales]
 
-                # Primero intentamos repartir una misma asignatura en días distintos.
-                # Si no hay hueco, se permite otra franja del mismo día como último recurso.
-                franjas_repartidas = [f for f in franjas_candidatas if f.dia not in dias_ya_usados]
-                for franja in franjas_repartidas + franjas_candidatas:
+            creadas_asignatura = []
+            dias_ya_usados = set(
+                horario.sesiones.filter(asignatura=asignatura, grupo=grupo)
+                .values_list("franja__dia", flat=True)
+            )
+
+            # Si es transversal y ya existe un plan global, se reutilizan esas franjas.
+            for franja in franjas_fijas:
+                if len(creadas_asignatura) >= necesarias:
+                    break
+                try:
+                    _crear_sesion_si_cabe(horario, asignatura, grupo, franja)
+                    resultado.creadas += 1
+                    creadas_asignatura.append(franja)
+                    dias_ya_usados.add(franja.dia)
+                    conteo_por_dia[franja.dia] += 1
+                    slots_usados.add((franja.dia, franja.hora_inicio, franja.hora_fin))
+                except ValidationError:
+                    continue
+
+            while len(creadas_asignatura) < necesarias:
+                franjas_candidatas = _franjas_ordenadas_para_asignatura(asignatura)
+                candidatas = _ordenar_candidatas_por_reparto(
+                    franjas_candidatas,
+                    dia_libre,
+                    conteo_por_dia,
+                    dias_ya_usados,
+                    slots_usados,
+                )
+
+                colocada = False
+                for franja in candidatas:
                     try:
                         _crear_sesion_si_cabe(horario, asignatura, grupo, franja)
                         resultado.creadas += 1
+                        creadas_asignatura.append(franja)
+                        dias_ya_usados.add(franja.dia)
+                        conteo_por_dia[franja.dia] += 1
+                        slots_usados.add((franja.dia, franja.hora_inicio, franja.hora_fin))
                         colocada = True
                         break
                     except ValidationError:
                         continue
+
                 if not colocada:
                     resultado.omitidas += 1
                     resultado.errores.append(
                         f"No se pudo colocar {asignatura.nombre} en {horario} sin solapar profesor/aula/grupo."
                     )
+                    break
+
+            if clave_global and clave_global not in plan_transversales:
+                franjas_creadas = list(
+                    horario.sesiones.filter(asignatura=asignatura, grupo=grupo)
+                    .select_related("franja")
+                    .order_by("franja__dia", "franja__hora_inicio")
+                )
+                plan_transversales[clave_global] = [s.franja for s in franjas_creadas]
 
     return resultado
+
 
 
 def detectar_conflictos_asignaturas(asignaturas: Iterable[Asignatura]):
